@@ -57,7 +57,6 @@ ESP8266WebServer server ( 80 );
 SettingManager smManager(pinLed);
 ElectricManager elecManager(pinCurrent,pinLed);
 HourManager hrManager(2390,pinLed);
-//SparkfunManager sfManager(pinLed); //"P4z49d76BYSgw4Y4wXnd","DJKJmvynz2Tp65j56yQX",
 WifiManager wfManager(pinLed);
 ioManager sfManager(pinLed);
 
