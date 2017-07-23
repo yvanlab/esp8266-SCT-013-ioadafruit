@@ -10,6 +10,14 @@
 #include "WProgram.h"
 #endif
 
+#ifdef MCPOC_TEST
+  #define RHRRR_LABEL "RhrrrTt"
+  #define RHRRRAP_LABEL "RhrrrapTt"
+#else
+  #define RHRRR_LABEL "Rhrrr"
+  #define RHRRRAP_LABEL "Rhrrrap"
+#endif
+
 
 #define EE_ADR_SSID 0
 #define MAX_SSID 32
@@ -45,8 +53,8 @@ unsigned char WifiManager::connectSSID(char *ssid, char *pass){
     inbTest++;
     switchOff();
   }
-  WiFi.softAP("Rhrrr");
-  MDNS.begin ( "rhrrr" );
+  WiFi.softAP(RHRRR_LABEL );
+  MDNS.begin ( RHRRR_LABEL );
   setStatus(millis(), WiFi.status(), "ssid");
   return WiFi.status();
 }
@@ -55,8 +63,8 @@ unsigned char WifiManager::connectAP(){
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
   delay(100);
-  WiFi.softAP("Rhrrrap");
-  MDNS.begin ( "rhrrr", WiFi.softAPIP() );
+  WiFi.softAP(RHRRRAP_LABEL);
+  MDNS.begin ( RHRRR_LABEL, WiFi.softAPIP() );
   setStatus(millis(), WiFi.status(), "ap");
   return WiFi.status();
 }

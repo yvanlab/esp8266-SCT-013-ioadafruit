@@ -25,6 +25,7 @@ class BaseManager
     virtual String toString(){return "";}
     String log();
     virtual String getClassName(){ return "BaseManager";}
+    unsigned long getLastUpdate(){ return m_timeStampStatus;}
   private:
     unsigned char m_pinLed;
     unsigned long m_timeStampStatus;

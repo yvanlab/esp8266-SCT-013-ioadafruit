@@ -48,7 +48,7 @@ class ioManager : public BaseManager
 
     String getClassName(){return "ioManager";}
   private:
-    SparkVariable m_variables[8];
+    SparkVariable m_variables[10];
     WiFiClient m_client;
     //Adafruit_MQTT_Client *m_mqtt;//(&client, MQTT_SERVER, AIO_SERVERPORT);
     //Adafruit_MQTT_Publish *m_cur;
