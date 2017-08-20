@@ -12,18 +12,39 @@
 ElectricManager::ElectricManager( unsigned char pinCurrent,unsigned char pinLed, unsigned char address)
   : BaseManager(pinLed) , ReadManager(address) {
   m_pinCurrent = pinCurrent;
+  pinMode ( pinCurrent, INPUT );
 
 }
 
-
-String ElectricManager::toString() {
-  String mesure = "Measure  sampling["+String (m_nbreMeasure) + "] - Min[" + String(m_minCurrentValue);
-  mesure += "] - Max[" + String(m_maxCurrentValue) + "] - Delta[" + String (m_maxCurrentValue-m_minCurrentValue);
-  mesure += "] - nbMesure[" + String(m_globalNbreValue) + "]   ";
-  mesure += "\nCurrent[" + String (m_valueCurrent)  + " mA]-Watt [" + String(m_valuePower) + "]";
-  return mesure;
-
+double ElectricManager::getIntantKWH() {
+  // extrapolation sur 24H a partir d une 1mn de mesure
+  double result = m_valueCurrent;
+  return ((result/1000.0)*220*60)/(1000.0*3600);
 }
+
+
+/*
+{
+  "current" : "10250",
+  "KWT"  : "40.25",
+  "LAST_KWT"  : 20.25
+},
+*/
+String ElectricManager::toString(boolean bJson) {
+  if (bJson==JSON_TEXT)
+    return  String ("\"current\":\"" + String(m_valueCurrent) +\
+            "\",\"KWH\":\"" + String(getInstantKWH()) +\
+            "\",\"lastKWT\":\"" + String(m_previousWattHour) +"\"");
+  else {
+    String mesure = "Measure  sampling["+String (m_nbreMeasure) + "] - Min[" + String(m_minCurrentValue);
+    mesure += "] - Max[" + String(m_maxCurrentValue) + "] - Delta[" + String (m_maxCurrentValue-m_minCurrentValue);
+    mesure += "] - nbMesure[" + String(m_globalNbreValue) + "]   ";
+    mesure += "\nCurrent[" + String (m_valueCurrent)  + " mA]-Watt [" + String(m_valuePower) + "]";
+    return mesure;
+  }
+}
+
+
 unsigned long int ElectricManager::readCurrent(){
   // read during 2 periods 50 Hz :
   switchOn();
@@ -34,7 +55,7 @@ unsigned long int ElectricManager::readCurrent(){
   unsigned long startMS = millis();
   while ((millis()-startMS)< twoPeriodsMS) {
       int currentValue = analogRead(m_pinCurrent);
-      //Serial.println (currentValue);
+      //DEBUGLOG (currentValue);
       if (currentValue > m_maxCurrentValue ) m_maxCurrentValue = currentValue;
       if (currentValue < m_minCurrentValue ) m_minCurrentValue = currentValue;
       m_nbreMeasure ++;
@@ -45,7 +66,7 @@ unsigned long int ElectricManager::readCurrent(){
   // 1 mv    == 3 300/1024  ==  3
   const int coefCurrent = 60; // mA((2000/535)/220)*(3300/1024);
   m_valueCurrent = (m_maxCurrentValue-m_minCurrentValue)*coefCurrent;
-  setStatus(millis(), 0, "ok",false);
+  setStatus(0, "ok");
   switchOff();
   return m_valueCurrent;
 }
@@ -69,8 +90,9 @@ unsigned long int ElectricManager::getAverageCurrent(){
 }
 
 double ElectricManager::getKWattHour(){
-  //Serial.println(m_wattHour);
-  double KwattHour = (m_wattHour/(3600.0*1000.0));
+  //DEBUGLOG(m_wattHour);
+  m_previousWattHour = (m_wattHour/(3600.0*1000.0));
   m_wattHour = 0.0;
-  return KwattHour;
+  return m_previousWattHour;
+;
 }

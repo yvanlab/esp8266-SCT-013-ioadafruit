@@ -24,7 +24,7 @@ class SettingManager : public BaseManager
     char m_privateKey[64];
     char m_publicKey[64];
     SettingManager(unsigned char pinLed);
-    String toString();
+    String toString(boolean bJson);
     unsigned char readData();
     unsigned char writeData();
     unsigned char clearData();

@@ -27,6 +27,7 @@ class ElectricManager : public BaseManager,public ReadManager
     unsigned long  m_cumulCurrent = 0;
 
     double  m_wattHour = 0.0;
+    double  m_previousWattHour = 0.0;
     unsigned long  m_previousTimeMeasure = 0;
 
     unsigned char  m_pinCurrent = A0;
@@ -36,7 +37,7 @@ class ElectricManager : public BaseManager,public ReadManager
 
     ElectricManager(unsigned char pinCurrent,unsigned char pinLed, unsigned char address=0);
 
-    String toString();
+    String toString(boolean bJson);
     unsigned long int readCurrent();
     unsigned long int readCumulCurrent();
     unsigned long int getAverageCurrent();
@@ -46,6 +47,7 @@ class ElectricManager : public BaseManager,public ReadManager
 
   private:
     const unsigned long twoPeriodsMS = 2000/50;
+    double getInstantKWH();
 
 };
 

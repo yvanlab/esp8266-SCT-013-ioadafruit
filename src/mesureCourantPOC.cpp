@@ -1,34 +1,7 @@
-/*
- * Copyright (c) 2015, Majenko Technologies
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *
- * * Redistributions of source code must retain the above copyright notice, this
- *   list of conditions and the following disclaimer.
- *
- * * Redistributions in binary form must reproduce the above copyright notice, this
- *   list of conditions and the following disclaimer in the documentation and/or
- *   other materials provided with the distribution.
- *
- * * Neither the name of Majenko Technologies nor the names of its
- *   contributors may be used to endorse or promote products derived from
- *   this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+
 #include <Arduino.h>
 #include <ESP8266WebServer.h>
+#include <ESP8266HTTPUpdateServer.h>
 
 #include "ElectricManager.h"
 #include "HourManager.h"
@@ -38,41 +11,36 @@
 #include "ioManager.h"
 #include "DHTManager.h"
 
-//#include <DateTime.h>
-//#include "EmonLib.h"                   // Include Emon Library
-
-#define MQTT_DEBUG
-#define MQTT_ERROR
-#include <Adafruit_MQTT.h>                                 // Adafruit MQTT library
-#include <Adafruit_MQTT_Client.h>                           // Adafruit MQTT library
-
-
 extern "C" {
 #include "user_interface.h"
 }
 
 
-/*#ifdef MCPOC_TEST
-  #define LOG_LABEL "logT"
-  #define WATT_LABEL "wattT"
-  #define CURRENT_LABEL "currentT"
-  #define KWH_LABEL "KWHT"
-  #define HUM_LABEL "HUMT"
-  #define TEMP_LABEL "TEMPT"
-#else*/
-  #define LOG_LABEL "log"
-  #define WATT_LABEL "watt"
-  #define CURRENT_LABEL "current"
-  #define KWH_LABEL "KWH"
-  #define HUM_LABEL "HUM"
-  #define TEMP_LABEL "TEMP"
-//#endif
+#define MODULE_NAME CURRENT_NAME
+#define MODULE_MDNS CURRENT_MDNS
+#define MODULE_MDNS_AP CURRENT_MDNS_AP
+#define MODULE_IP   CURRENT_IP
 
 
-const int  pinLed = D4;
-const int  pinCurrent = A0;
+
+#define LOG_LABEL "log"
+//#define WATT_LABEL "watt"
+#define CURRENT_LABEL "current"
+#define KWH_LABEL "KWH"
+#define HUM_LABEL "HUM"
+#define TEMP_LABEL "TEMP"
+
+
+
+const unsigned char  pinLed = D4;
+const unsigned char  pinCurrent = A0;
+const unsigned long timerFrequence = 6000;//ms
+const unsigned long maxNbreMesure = 60000/timerFrequence; // send KPI every minute
+
+
 
 ESP8266WebServer server ( 80 );
+ESP8266HTTPUpdateServer httpUpdater;
 SettingManager smManager(pinLed);
 ElectricManager elecManager(pinCurrent,pinLed);
 HourManager hrManager(2390,pinLed);
@@ -82,28 +50,11 @@ DHTManager dhtManager(D2,pinLed);
 
 os_timer_t myTimer;
 boolean tickOccured;
-//EnergyMonitor emon1;
-
-//unsigned long  m_cumulCurrent = 0;
-//unsigned char  currentDay = 0;
-
-const unsigned long timerFrequence = 6000;//ms
-const unsigned long maxNbreMesure = 60000/timerFrequence; // send KPI every minute
-
-//unsigned long m_timeReference=0;
 
 
-
-
-/************ Global State (you don't need to change this!) ******************/
-
-
-// start of timerCallback
 void timerCallback(void *pArg) {
      tickOccured = true;
-} // End of timerCallback
-
-
+}
 
 void restartESP() {
   ESP.restart();
@@ -112,6 +63,66 @@ void restartESP() {
 void timerrestartESP(void *pArg) {
     restartESP();
 }
+
+String getJson()
+{
+  String tt("{\"module\":{");
+    tt += "\"nom\":\"" + String(MODULE_NAME) +"\"," ;
+    tt += "\"version\":\"" + String(CURRENT_VERSION) +"\"," ;
+    tt += "\"uptime\":\"" + NTP.getUptimeString() +"\"," ;
+    tt += "\"build_date\":\""+ String(__DATE__" " __TIME__)  +"\"},";
+    tt += "\"LOG\":["+wfManager.log(JSON_TEXT)  + "," + dhtManager.log(JSON_TEXT)  + "," + hrManager.log(JSON_TEXT) + ","+ elecManager.log(JSON_TEXT) + "," + sfManager.log(JSON_TEXT)+"],";
+    tt += "\"current\":{" + elecManager.toString(JSON_TEXT) + "},";
+    tt += "\"dht\":{"+ dhtManager.toString(JSON_TEXT) + "},";
+    //tt += "\"datetime\":{\"date\":\""+NTP.getDateStr()+"\",\"time\":\""+NTP.getTimeStr()+"\"}}";
+    tt += "\"datetime\":{" + hrManager.toDTString(JSON_TEXT) + "}}";
+    return tt;
+}
+
+/*
+{
+  "module" : {
+    "nom":"blabla",
+    "version" : "1.0.2",
+    "date":"10/08/2017 18:15"
+    "Uptime": "32:55"
+  },
+"log" : [
+    {
+    "nom" : "class name",
+    "code" : "10",
+    "description" : "blabla"
+    },
+    {
+    "nom" : "class name",
+    "code" : "10",
+    "description" : "blabla"
+    }
+  ],
+  "CURRENT" : {
+    "current" : "10250",
+    "KWT"  : "40.25",
+  },
+  "DHT" : {
+    "dhtHum" : "41.70",
+    "dhtTemp" : "27.70"
+  }
+  "DATETIME" : {
+    "date" : "25/10/2017",
+    "time" : "18:08"
+  }
+}
+
+*/
+
+
+void dataSummaryJson() {
+	digitalWrite ( pinLed, LOW );
+  server.send ( 200, "text/json", getJson() );
+  digitalWrite ( pinLed, HIGH );
+}
+
+
 
 void dataSummaryPage() {
 	digitalWrite ( pinLed, LOW );
@@ -131,19 +142,19 @@ void dataSummaryPage() {
     </head>\
     <body>\
       <h1>Real time data!</h1>";
-  message += "<p>" + wfManager.toString() + "</p>";
-  message += "<p>Date Hour : " + hrManager.toDTString() + "</p>";
+  message += "<p>" + wfManager.toString(STD_TEXT) + "</p>";
+  message += "<p>Date Hour : " + hrManager.toDTString(STD_TEXT) + "</p>";
   message += "<p>Uptime: " + hrManager.toUTString() + "</p>";
-  message += "<p>" + elecManager.toString() + "</p>";
-  message += "<p>" + dhtManager.toString() + "</p>";
+  message += "<p>" + elecManager.toString(STD_TEXT) + "</p>";
+  message += "<p>" + dhtManager.toString(STD_TEXT) + "</p>";
   message += "<h2>Log data</h2>\
   		<TABLE border=2 cellpadding=10 log>";
-  message += "<TR><TD>"+smManager.log()+"</TD></TR>";
-  message += "<TR><TD>"+elecManager.log()+"</TD></TR>";
-  message += "<TR><TD>"+hrManager.log()+"</TD></TR>";
-  message += "<TR><TD>"+sfManager.log()+"</TD></TR>";
-  message += "<TR><TD>"+wfManager.log()+"</TD></TR>";
-  message += "<TR><TD>"+dhtManager.log()+"</TD></TR>";
+  message += "<TR><TD>"+smManager.log(STD_TEXT)+"</TD></TR>";
+  message += "<TR><TD>"+elecManager.log(STD_TEXT)+"</TD></TR>";
+  message += "<TR><TD>"+hrManager.log(STD_TEXT)+"</TD></TR>";
+  message += "<TR><TD>"+sfManager.log(STD_TEXT)+"</TD></TR>";
+  message += "<TR><TD>"+wfManager.log(STD_TEXT)+"</TD></TR>";
+  message += "<TR><TD>"+dhtManager.log(STD_TEXT)+"</TD></TR>";
   message += "</TABLE>\
   		        <h2>Links</h2>";
   message += "<A HREF=\""+WiFi.localIP().toString()+ "\">cette page</A></br>";
@@ -192,8 +203,8 @@ void displayCredentialCollection() {
   message += "</ul>";
   message += "<form method='get' action='set'>";
   message += "<label>SSID:</label><input name='ssid' test length=32 value=\""+String(smManager.m_ssid) +"\"><br>";
-  message += "<label>Pass:</label><input name='pass' length=64 value=\""+String(smManager.m_password) +"\"><br>";
-  message += "<label>PrivateKey:</label><input name='sparkPrivate' length=64 value=\""+String(smManager.m_privateKey) +"\"><br>";
+  message += "<label>Pass:</label><input name='pass' length=64 value=\""+String(HIDDEN_KEY) +"\"><br>";
+  message += "<label>PrivateKey:</label><input name='sparkPrivate' length=64 value=\""+String(HIDDEN_KEY) +"\"><br>";
   message += "<label>PublicKey:</label><input name='sparkPublic' length=64 value=\""+String(smManager.m_publicKey) +"\"><br>";
   message += "<input type='submit'></form>";
   message += "</body></html>";
@@ -209,21 +220,16 @@ void setCredential(){
   if (str.length()>0)
     strcpy(smManager.m_ssid, str.c_str());
   str = server.arg("pass");
-  if (str.length()>0)
+  if (str.length()>0 && str != HIDDEN_KEY)
     strcpy(smManager.m_password,str.c_str());
   str = server.arg("sparkPrivate");
-  if (str.length()>0)
+  if (str.length()>0 && str != HIDDEN_KEY)
       strcpy(smManager.m_privateKey,str.c_str());
   str = server.arg("sparkPublic");
   if (str.length()>0)
       strcpy(smManager.m_publicKey,str.c_str());
   smManager.writeData();
   server.send ( 200, "text/html", "data recorded.restart board");
-  /*String message = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<!DOCTYPE HTML>\r\n<html>";
-  message += "data recorded ";
-  message += "<p> restart board</html>\r\n\r\n";
-  server.send ( 200, "text/html", message );*/
-
 }
 
 void clearMemory(){
@@ -231,45 +237,17 @@ void clearMemory(){
   server.send ( 200, "text/html", "ok");
 }
 
-void MQTT_connect(Adafruit_MQTT_Client *mqtt) {
-
-  Serial.println("start Connecting to MQTT... ");
-  if (mqtt->connected()) { return; }                     // Stop and return to Main Loop if already connected to Adafruit IO
-  Serial.print("Connecting to MQTT... ");
-  /*  Serial.println(publicKey.c_str());
-      Serial.println(privateKey.c_str());*/
-
-
-  uint8_t ret = mqtt->connect(/*publicKey.c_str(),privateKey.c_str()*/);//publicKey.c_str(),privateKey.c_str());
-  if ( ret != 0 ) {
-    Serial.println(mqtt->connectErrorString(ret));
-    mqtt->disconnect();
-  } else {
-    Serial.println("MQTT Connected!");
-    delay(500);
-  }
-}
-
-
-void setup ( void ) {
-  // Iniialise input
-  pinMode ( pinCurrent, INPUT );
-  pinMode ( pinLed, OUTPUT );
-
-
-	Serial.begin ( 115200 );
-
-  smManager.readData();
-  Serial.println(smManager.toString());
-  if (wfManager.connectSSID(smManager.m_ssid,smManager.m_password )==WL_CONNECTED) {
+void startWiFiserver() {
+  if (wfManager.connectSSID(smManager.m_ssid,smManager.m_password,IPAddress(MODULE_IP), MODULE_MDNS )==WL_CONNECTED) {
     os_timer_setfn(&myTimer, timerCallback, NULL);
     os_timer_arm(&myTimer, timerFrequence, true);
     server.on ( "/", dataSummaryPage );
     server.onNotFound ( dataSummaryPage );
+    hrManager.begin("pool.ntp.org", 1, true);
   } else {
     os_timer_setfn(&myTimer, timerrestartESP, NULL);
     os_timer_arm(&myTimer, 5*60*1000, true);
-    wfManager.connectAP();
+    wfManager.connectAP(MODULE_MDNS_AP);
     server.on ( "/", displayCredentialCollection );
     server.onNotFound ( displayCredentialCollection );
   }
@@ -277,12 +255,24 @@ void setup ( void ) {
   server.on ( "/restart", restartESP );
   server.on ( "/set", setCredential );
   server.on ( "/credential", displayCredentialCollection );
-  server.begin();
-  Serial.println ( "HTTP server started" );
-  Serial.println(wfManager.toString());
+  server.on ( "/status", dataSummaryJson );
+  httpUpdater.setup(&server, ((const char *)"/firmware"), MODULE_UPDATE_LOGIN, MODULE_UPDATE_PASS);
 
+  server.begin();
+  Serial.println( "HTTP server started" );
+  Serial.println(wfManager.toString(STD_TEXT));
 }
 
+
+void setup ( void ) {
+  // Iniialise input
+
+  Serial.begin ( 115200 );
+
+  smManager.readData();
+  DEBUGLOG("");DEBUGLOG(smManager.toString(STD_TEXT));
+  startWiFiserver();
+}
 
 void loop ( void ) {
 	server.handleClient();
@@ -292,33 +282,41 @@ void loop ( void ) {
     elecManager.readCumulCurrent();
 
 
-    hrManager.getCurrentEpoch();
+    //hrManager.getCurrentEpoch();
 
-  #ifdef MCPOC_TEST
-    Serial.println ("debug mode");
-    Serial.println (elecManager.toString());
-    Serial.println (hrManager.toDTString());
-    Serial.println (dhtManager.toString());
+  DEBUGLOG("debug mode");
+    /*DEBUGLOG (elecManager.toString(STD_TEXT));
+    //DEBUGLOG (hrManager.toDTString(STD_TEXT));
+    DEBUGLOG (dhtManager.toString(STD_TEXT));
+
+    		DEBUGLOG(""); DEBUGLOG(" ");
+    		DEBUGLOG(NTP.getTimeDateString()); DEBUGLOG(" ");
+    		DEBUGLOG(NTP.isSummerTime() ? "Summer Time. " : "Winter Time. ");
+    		DEBUGLOG("WiFi is ");
+    		DEBUGLOG(WiFi.isConnected() ? "connected" : "not connected"); DEBUGLOG(". ");
+    		DEBUGLOG("Uptime: ");
+    		DEBUGLOG(NTP.getUptimeString()); DEBUGLOG(" since ");
+    		DEBUGLOG(NTP.getTimeDateString(NTP.getFirstSync()).c_str());
 
   #endif
     /*unsigned int averageCurrent = elecManager.getAverageCurrent();
     sfManager.addVariable("watt", String((220*averageCurrent)/1000));
     sfManager.addVariable("current", String(averageCurrent));*/
 
-    /*Serial.println ( smManager.log());
-    Serial.println ( elecManager.log());
-    Serial.println ( hrManager.log());
-    Serial.println ( sfManager.log());
-    Serial.println ( wfManager.log());
+    /*DEBUGLOG ( smManager.log());
+    DEBUGLOG ( elecManager.log());
+    DEBUGLOG ( hrManager.log());
+    DEBUGLOG ( sfManager.log());
+    DEBUGLOG ( wfManager.log());
 
     sfManager.sendKPIsToIO( smManager.m_privateKey, smManager.m_publicKey);*/
 
     if (elecManager.m_globalNbreValue == maxNbreMesure) {
       unsigned int averageCurrent = elecManager.getAverageCurrent();
-      Serial.println ( averageCurrent );
+      //DEBUGLOG ( averageCurrent );
 
       sfManager.addVariable(CURRENT_LABEL, String(averageCurrent));
-      sfManager.addVariable(WATT_LABEL,  String((220*averageCurrent)/1000));
+      //sfManager.addVariable(WATT_LABEL,  String((220*averageCurrent)/1000));
       // send KWattHour every 24 hours
       if (hrManager.isNextDay())
         sfManager.addVariable(KWH_LABEL,String(elecManager.getKWattHour()));
@@ -326,15 +324,32 @@ void loop ( void ) {
       sfManager.addVariable(HUM_LABEL, String(dhtManager.getHumidity()));
       sfManager.addVariable(TEMP_LABEL, String(dhtManager.getTemperature()));
 
-      if (smManager.newLog())   sfManager.addVariable(LOG_LABEL,smManager.log());
-      if (elecManager.newLog()) sfManager.addVariable(LOG_LABEL,elecManager.log());
-      if (hrManager.newLog())   sfManager.addVariable(LOG_LABEL,hrManager.log());
-      if (sfManager.newLog())   sfManager.addVariable(LOG_LABEL,sfManager.log());
-      if (wfManager.newLog())   sfManager.addVariable(LOG_LABEL,wfManager.log());
-      if (dhtManager.newLog())   sfManager.addVariable(LOG_LABEL,dhtManager.log());
-
-      //Serial.println (elecManager.getKWattHour());
-      //Serial.println(sfManager.toString());
+      if (smManager.newLog()){
+          sfManager.addVariable(LOG_LABEL,smManager.log(STD_TEXT));
+          smManager.clearLog();
+      }
+      if (elecManager.newLog()){
+        sfManager.addVariable(LOG_LABEL,elecManager.log(STD_TEXT));
+        elecManager.clearLog();
+      }
+      if (hrManager.newLog()) {
+        sfManager.addVariable(LOG_LABEL,hrManager.log(STD_TEXT));
+        hrManager.clearLog();
+      }
+      if (sfManager.newLog()) {
+        sfManager.addVariable(LOG_LABEL,sfManager.log(STD_TEXT));
+        sfManager.clearLog();
+      }
+      if (wfManager.newLog()) {
+        sfManager.addVariable(LOG_LABEL,wfManager.log(STD_TEXT));
+        wfManager.clearLog();
+      }
+      if (dhtManager.newLog()) {
+        sfManager.addVariable(LOG_LABEL,dhtManager.log(STD_TEXT));
+        dhtManager.clearLog();
+      }
+      //DEBUGLOG (elecManager.getKWattHour());
+      //DEBUGLOG(sfManager.toString());
       sfManager.sendKPIsToIO( smManager.m_privateKey, smManager.m_publicKey);
 
     }

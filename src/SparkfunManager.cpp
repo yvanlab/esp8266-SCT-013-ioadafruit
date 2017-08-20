@@ -46,16 +46,16 @@ unsigned char SparkfunManager::sendKPIsToIO(String privateKey, String publicKey)
   switchOn();
   WiFiClient client;
   if (!client.connect("data.sparkfun.com", 80)) {
-      Serial.println("connection failed");
-      setStatus(millis(), 1, "failed");
+      DEBUGLOG("connection failed");
+      setStatus(1, "failed");
       switchOff();
       return 1;
   }
 
 
   String url = buildRequest(privateKey,publicKey);
-  Serial.print("Requesting URL: ");
-  Serial.println(url);
+  DEBUGLOG("Requesting URL: ");
+  DEBUGLOG(url);
   client.print(url);
 
     // This will send the request to the server
@@ -63,9 +63,9 @@ unsigned char SparkfunManager::sendKPIsToIO(String privateKey, String publicKey)
   unsigned long timeout = millis();
   while (client.available() == 0) {
   if (millis() - timeout > 5000) {
-    Serial.println(">>> Client Timeout !");
+    DEBUGLOG(">>> Client Timeout !");
     client.stop();
-    setStatus(millis(), 2, "Timeout");
+    setStatus(2, "Timeout");
     switchOff();
     return 2;
     }
@@ -74,13 +74,13 @@ unsigned char SparkfunManager::sendKPIsToIO(String privateKey, String publicKey)
   // Read all the lines of the reply from server and print them to Serial
   while(client.available()){
     String line = client.readStringUntil('\r');
-    Serial.print(line);
+    DEBUGLOG(line);
   }
 
-  Serial.println();
-  Serial.println("closing connection");
+  DEBUGLOG();
+  DEBUGLOG("closing connection");
   m_lastSucessTime = (unsigned long) millis();
-  setStatus(millis(), 0, "Ok");
+  setStatus(0, "Ok");
   switchOff();
   return 0;
 }
