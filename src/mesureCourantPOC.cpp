@@ -6,15 +6,18 @@
 #include "ElectricManager.h"
 #include "HourManager.h"
 //#include "SparkfunManager.h"
+//#include "ioManager.h"
+#include "thingSpeakManager.h"
 #include "WifiManager.h"
 #include "SettingManager.h"
-#include "ioManager.h"
+
 #include "DHTManager.h"
 
 extern "C" {
 #include "user_interface.h"
 }
-
+//Channel ID : 349755
+//key : 80BASNDM7S5TMHIG
 
 #define MODULE_NAME CURRENT_NAME
 #define MODULE_MDNS CURRENT_MDNS
@@ -23,12 +26,12 @@ extern "C" {
 
 
 
-#define LOG_LABEL "log"
+#define LOG_LABEL     5 //"log"
 //#define WATT_LABEL "watt"
-#define CURRENT_LABEL "current"
-#define KWH_LABEL "KWH"
-#define HUM_LABEL "HUM"
-#define TEMP_LABEL "TEMP"
+#define CURRENT_LABEL 1 //"current"
+#define KWH_LABEL     2 //"KWH"
+#define HUM_LABEL     3 //"HUM"
+#define TEMP_LABEL    4 //"TEMP"
 
 
 
@@ -45,7 +48,8 @@ SettingManager smManager(pinLed);
 ElectricManager elecManager(pinCurrent,pinLed);
 HourManager hrManager(2390,pinLed);
 WifiManager wfManager(pinLed);
-ioManager sfManager(pinLed);
+//ioManager sfManager(pinLed);
+thingSpeakManager sfManager(pinLed);
 DHTManager dhtManager(D2,pinLed);
 
 os_timer_t myTimer;
@@ -72,7 +76,7 @@ String getJson()
     tt += "\"uptime\":\"" + NTP.getUptimeString() +"\"," ;
     tt += "\"build_date\":\""+ String(__DATE__" " __TIME__)  +"\"},";
     tt += "\"LOG\":["+wfManager.log(JSON_TEXT)  + "," + dhtManager.log(JSON_TEXT)  + "," + hrManager.log(JSON_TEXT) + ","+ elecManager.log(JSON_TEXT) + "," + sfManager.log(JSON_TEXT)+"],";
-    tt += "\"current\":{" + elecManager.toString(JSON_TEXT) + "},";
+    tt += "\"courant\":{" + elecManager.toString(JSON_TEXT) + "},";
     tt += "\"dht\":{"+ dhtManager.toString(JSON_TEXT) + "},";
     //tt += "\"datetime\":{\"date\":\""+NTP.getDateStr()+"\",\"time\":\""+NTP.getTimeStr()+"\"}}";
     tt += "\"datetime\":{" + hrManager.toDTString(JSON_TEXT) + "}}";
@@ -158,11 +162,12 @@ void dataSummaryPage() {
   message += "</TABLE>\
   		        <h2>Links</h2>";
   message += "<A HREF=\""+WiFi.localIP().toString()+ "\">cette page</A></br>";
-  message += "<A HREF=\"https://io.adafruit.com/"+ String(smManager.m_publicKey) +"\">io.adafruit.com</A></br>\
+  message += "<A HREF=\"https://thingspeak.com/channels/"+ String(smManager.m_privateKey) +"\">thingspeak</A></br>\
               <h2>Commands</h2>\
               <ul><li>/clear => erase credentials</li>\
                   <li>/credential => display credential</li>\
                   <li>/restart => restart module</li>\
+                  <li>/status => Json details</li>\
                   <li>/whatever => display summary</li></ul>";
   message += "</body></html>";
   server.send ( 200, "text/html", message );
@@ -204,8 +209,8 @@ void displayCredentialCollection() {
   message += "<form method='get' action='set'>";
   message += "<label>SSID:</label><input name='ssid' test length=32 value=\""+String(smManager.m_ssid) +"\"><br>";
   message += "<label>Pass:</label><input name='pass' length=64 value=\""+String(HIDDEN_KEY) +"\"><br>";
-  message += "<label>PrivateKey:</label><input name='sparkPrivate' length=64 value=\""+String(HIDDEN_KEY) +"\"><br>";
-  message += "<label>PublicKey:</label><input name='sparkPublic' length=64 value=\""+String(smManager.m_publicKey) +"\"><br>";
+  message += "<label>ChannelNumber:</label><input name='sparkPrivate' length=64 value=\""+String(HIDDEN_KEY) +"\"><br>";
+  message += "<label>WriteAPIKey:</label><input name='sparkPublic' length=64 value=\""+String(smManager.m_publicKey) +"\"><br>";
   message += "<input type='submit'></form>";
   message += "</body></html>";
 
@@ -259,6 +264,7 @@ void startWiFiserver() {
   httpUpdater.setup(&server, ((const char *)"/firmware"), MODULE_UPDATE_LOGIN, MODULE_UPDATE_PASS);
 
   server.begin();
+
   Serial.println( "HTTP server started" );
   Serial.println(wfManager.toString(STD_TEXT));
 }
@@ -324,7 +330,7 @@ void loop ( void ) {
       sfManager.addVariable(HUM_LABEL, String(dhtManager.getHumidity()));
       sfManager.addVariable(TEMP_LABEL, String(dhtManager.getTemperature()));
 
-      if (smManager.newLog()){
+    /*  if (smManager.newLog()){
           sfManager.addVariable(LOG_LABEL,smManager.log(STD_TEXT));
           smManager.clearLog();
       }
@@ -347,10 +353,11 @@ void loop ( void ) {
       if (dhtManager.newLog()) {
         sfManager.addVariable(LOG_LABEL,dhtManager.log(STD_TEXT));
         dhtManager.clearLog();
-      }
+      }*/
       //DEBUGLOG (elecManager.getKWattHour());
       //DEBUGLOG(sfManager.toString());
-      sfManager.sendKPIsToIO( smManager.m_privateKey, smManager.m_publicKey);
+      DEBUGLOG(sfManager.toString(STD_TEXT));
+      sfManager.sendIoT( smManager.m_privateKey, smManager.m_publicKey);
 
     }
     tickOccured = false;

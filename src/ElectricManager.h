@@ -48,6 +48,7 @@ class ElectricManager : public BaseManager,public ReadManager
   private:
     const unsigned long twoPeriodsMS = 2000/50;
     double getInstantKWH();
+    
 
 };
 

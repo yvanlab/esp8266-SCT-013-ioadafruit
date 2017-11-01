@@ -16,7 +16,7 @@ ElectricManager::ElectricManager( unsigned char pinCurrent,unsigned char pinLed,
 
 }
 
-double ElectricManager::getIntantKWH() {
+double ElectricManager::getInstantKWH() {
   // extrapolation sur 24H a partir d une 1mn de mesure
   double result = m_valueCurrent;
   return ((result/1000.0)*220*60)/(1000.0*3600);
