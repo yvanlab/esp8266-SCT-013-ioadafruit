@@ -221,12 +221,17 @@ void displayCredentialCollection() {
 }
 
 void setCredential(){
+  bool restartNeeded = false;
   String str = server.arg("ssid");
-  if (str.length()>0)
+  if (str.length()>0) {
     strcpy(smManager.m_ssid, str.c_str());
+    restartNeeded = true;
+  }
   str = server.arg("pass");
-  if (str.length()>0 && str != HIDDEN_KEY)
+  if (str.length()>0 && str != HIDDEN_KEY) {
     strcpy(smManager.m_password,str.c_str());
+    restartNeeded = true;
+  }
   str = server.arg("sparkPrivate");
   if (str.length()>0 && str != HIDDEN_KEY)
       strcpy(smManager.m_privateKey,str.c_str());
@@ -234,7 +239,13 @@ void setCredential(){
   if (str.length()>0)
       strcpy(smManager.m_publicKey,str.c_str());
   smManager.writeData();
-  server.send ( 200, "text/html", "data recorded.restart board");
+  if (restartNeeded) {
+    server.send ( 200, "text/html", "data recorded.restart board");
+    restartESP();
+  } else {
+    server.send ( 200, "text/html", "data recorded");
+  }
+
 }
 
 void clearMemory(){
